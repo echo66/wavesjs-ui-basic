@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+  	<script type="text/javascript" src="d3.v2.js"></script>
+  	<script type="text/javascript" src="EventEmitter.js"></script>
+  	<script type="text/javascript" src="interactions/EventSource.js"></script>
+  	<script type="text/javascript" src="core/Timeline.js"></script>
+  	<script type="text/javascript">
+  		var C1 = function() {
+
+  			EventEmitter.call(this);
+
+  			this.method1 = function() {
+  				console.log("method 1 invoked");
+  			}
+
+  		}
+
+  		C1.prototype = Object.create(EventEmitter.prototype);
+
+  		C1.prototype.constructor = C1;
+
+  		var i = new C1();
+
+
+
+
+  		var C2 = function(a) {
+
+  			var a = a - 1;
+
+  			this.method1 = function() {
+  				console.log(a);
+  			}
+  		}
+
+  		var C3 = function(a) {
+
+  			C2.call(this, a);
+
+  			var a = a;
+
+  			this.method2 = function() {
+  				console.log(a);
+  			}
+  		}
+
+  	</script>
+  </body>
+</html>
