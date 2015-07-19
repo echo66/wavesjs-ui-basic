@@ -1,4 +1,5 @@
 'use strict'
+
 /**
 *  http://javascript.info/tutorial/keyboard-events
 */
@@ -37,3 +38,7 @@ function Keyboard(el) {
 	}
 
 }
+
+Keyboard.prototype = Object.create(EventSource.prototype);
+
+Keyboard.prototype.constructor = Keyboard;

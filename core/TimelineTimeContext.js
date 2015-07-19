@@ -14,9 +14,10 @@
 *
 *  It also maintain an array of references to all the LayerTimeContext attached to the timeline to propagate some global change on the time to pixel representation
 */
-function TimelineTimeContext() {
+function TimelineTimeContext(pixelsPerSecond, visibleWidth) {
 
-	this.params = params;
+	AbstractTimeContext.call(this, {});
+
 	this._children = [];
 
 	this._xScale = null;
@@ -28,14 +29,20 @@ function TimelineTimeContext() {
 	this._stretchRatio = 1;
 
 	Object.defineProperties(this, {
-		'containersDuration' : {
-			get: function() { 
-				return this._containersDuration; 
+
+		'pixelsPerSecond' : {
+			get : function() {
+				return this._pixelsPerSecond
 			}, 
-			set: function(value) { 
-				this._containersDuration = value; 
+
+			set : function(value) {
+				this._pixelsPerSecond = value;
+
+				this.xScaleRange = [0, this.pixelsPerSecond];
+				this._visibleDuration = this.visibleWidth / this.pixelsPerSecond;
 			}
-		},
+		}, 
+
 		'offset' : {
 			get: function() {
 				return this._offset;
@@ -44,33 +51,71 @@ function TimelineTimeContext() {
 				this._offset = value;
 			}
 		}, 
-		'stretchRatio' : {
-			get: function() {
-				return this._stretchRatio;
+
+		'zoom' : {
+			get : function() {
+				return this._zoom;
 			}, 
-			set: function(value) {
+			set : function(value) {
 				const xScale = this.originalXScale.copy();
-				const domain = xScale.domain();
-				const min = domain[0];
-				const max = domain[1];
+				const _xScale$domain = xScale.domain();
+				const min = _xScale$domain[0]; 
+				const max = _xScale$domain[1]; 
 				const diff = (max - min) / value;
 
 				xScale.domain([min, min + diff]);
 
 				this._xScale = xScale;
-				this._stretchRatio = value;
+				this._zoom = value;
 
 				// Propagate change to children who have their own xScale
-				const ratioChange = value / (this._stretchRatio);
+				const ratioChange = value / (this._zoom);
 
 				this._children.forEach(function(child) {
 					if (!child._xScale) { 
 						return; 
 					}
-					child.stretchRatio = child.stretchRatio * ratioChange;
+					child.stretchRatio = child.zoom * ratioChange;
 				});
 			}
 		}, 
+
+		'visibleWidth' : {
+			get : function() {
+				return this._visibleWidth;
+			}, 
+
+			set : function(value) {
+				const widthRatio = value / this.visibleWidth;
+
+				this._visibleWidth = value;
+				this._visibleDuration = this.visibleWidth / this.pixelsPerSecond;
+
+				if (this.maintainVisibleDuration) {
+					this.pixelsPerSecond = this.pixelsPerSecond * widthRatio;
+				}
+			}
+		},
+
+		'visibleDuration' : {
+			get : function() {
+				return this._visibleDuration;
+			}, 
+			// set : function(value) {
+			// 	this._visibleDuration = value;
+			// }
+		}, 
+
+		'maintainVisibleDuration' : {
+			get : function() {
+				return this._maintainVisibleDuration;
+			}, 
+			set : function(bool) {
+				this._maintainVisibleDuration = bool;
+			}
+		},
+
+		// @TODO rename to timeToPixel
 		'xScale' : {
 			get: function() {
 				return this._xScale;
@@ -106,3 +151,7 @@ function TimelineTimeContext() {
 		}
 	})
 }
+
+TimelineTimeContext.prototype = Object.create(AbstractTimeContext.prototype);
+
+TimelineTimeContext.prototype.constructor = TimelineTimeContext;

@@ -601,3 +601,7 @@ function Layer(dataType, data, options) {
 		});
 	}
 }
+
+Layer.prototype = Object.create(EventEmitter.prototype);
+
+Layer.prototype.constructor = Layer;

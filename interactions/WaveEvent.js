@@ -35,3 +35,7 @@ function WaveEvent(type, originalEvent) {
     }
 
 }
+
+WaveEvent.prototype = Object.create(BaseState.prototype);
+
+WaveEvent.prototype.constructor = WaveEvent;

@@ -8,47 +8,41 @@
   <body>
   	<script type="text/javascript" src="d3.v2.js"></script>
   	<script type="text/javascript" src="EventEmitter.js"></script>
-  	<script type="text/javascript" src="interactions/EventSource.js"></script>
+    <script type="text/javascript" src="interactions/EventSource.js"></script>
+    <script type="text/javascript" src="interactions/Surface.js"></script>
+    <script type="text/javascript" src="interactions/Keyboard.js"></script>
+    <script type="text/javascript" src="core/AbstractTimeContext.js"></script>
+    <script type="text/javascript" src="core/TimelineTimeContext.js"></script>
+    <script type="text/javascript" src="core/Track.js"></script>
+    <script type="text/javascript" src="core/Track.js"></script>
+    <script type="text/javascript" src="core/TrackCollection.js"></script>
   	<script type="text/javascript" src="core/Timeline.js"></script>
   	<script type="text/javascript">
-  		var C1 = function() {
 
-  			EventEmitter.call(this);
+      var track1Div = document.createElement("div");
+      document.body.appendChild(track1Div);
+      var track2Div = document.createElement("div");
+      document.body.appendChild(track2Div);
+      var track3Div = document.createElement("div");
+      document.body.appendChild(track3Div);
 
-  			this.method1 = function() {
-  				console.log("method 1 invoked");
-  			}
+      var trackHeight = 100;
 
-  		}
+      var data = [{ width: 3, x: 0 }, { width: 6, x: 6}];
+      
+      var timeline = new Timeline();
 
-  		C1.prototype = Object.create(EventEmitter.prototype);
+      // var track1 = new Track(track1Div, trackHeight);
+      // var track2 = new Track(track2Div, trackHeight);
+      // var track3 = new Track(track3Div, trackHeight);
 
-  		C1.prototype.constructor = C1;
+      // timeline.add(track1);
+      // timeline.add(track2);
+      // timeline.add(track3);
 
-  		var i = new C1();
-
-
-
-
-  		var C2 = function(a) {
-
-  			var a = a - 1;
-
-  			this.method1 = function() {
-  				console.log(a);
-  			}
-  		}
-
-  		var C3 = function(a) {
-
-  			C2.call(this, a);
-
-  			var a = a;
-
-  			this.method2 = function() {
-  				console.log(a);
-  			}
-  		}
+      timeline.createTrack(track1Div, trackHeight, "track1");
+      timeline.createTrack(track2Div, trackHeight, "track2");
+      
 
   	</script>
   </body>

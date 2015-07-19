@@ -5,7 +5,6 @@ function SelectionState(timeline) extends BaseState {
 
 	BaseState.call(this, timeline);
 
-
 	this.currentLayer = null;
 	// need a cached
 	this.selectedItems = null;
@@ -86,7 +85,7 @@ function SelectionState(timeline) extends BaseState {
 
 	this._updateBrush = function(e, container) {
 		const brushElement = container.brushElement;
-		const translate = `translate(${e.area.left}, ${e.area.top})`;
+		const translate = "translate(" + e.area.left + ", " + e.area.top + ")";
 
 		brushElement.setAttributeNS(null, 'transform', translate);
 		brushElement.setAttributeNS(null, 'width', e.area.width);
@@ -206,3 +205,7 @@ function SelectionState(timeline) extends BaseState {
 		}
 	}
 }
+
+SelectionState.prototype = Object.create(BaseState.prototype);
+
+SelectionState.prototype.constructor = SelectionState;

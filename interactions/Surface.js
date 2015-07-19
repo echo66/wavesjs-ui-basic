@@ -53,7 +53,7 @@ function Surface(el){
 
 		// should handle padding
 
-		return { x, y };
+		return { x: x, y: y };
 	}
 
 	/**
@@ -129,3 +129,7 @@ function Surface(el){
 		// @TODO: mouseenter, mouseleave, wheel ?
 	}
 }
+
+Surface.prototype = Object.create(EventSource.prototype);
+
+Surface.prototype.constructor = Surface;

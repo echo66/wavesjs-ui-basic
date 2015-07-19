@@ -80,3 +80,7 @@ function EditionState(timeline) {
 
 	}
 }
+
+EditionState.prototype = Object.create(BaseState.prototype);
+
+EditionState.prototype.constructor = EditionState;

@@ -1,442 +1,312 @@
 'use strict'
 
-function Timeline() {
+/**
+ *
+ * The `timeline` is the main entry point of a temporal visualization.
+ *
+ * The `timeline`:
+ * - contains factories to manage its `views` and `layers`,
+ * - is the central hub for all user interaction events (keyboard, mouse),
+ * - holds the current interaction `state` which defines how the different timeline elements (views, layers, shapes) respond to those events.
+ *
+ *
+ * The `Timeline` class is the main entry point to create a representation of temporal data.
+ * A `Timeline` instance can have multiples `Track` instances, which are basically a track window on the overall timeline.
+ *
+ * The timeline hold the current interaction state and is the central hub for keyboard as well as mouse events.
+ * States are there to facilitating interactions with the timeline for:
+ * - zooming
+ * - moving
+ * - editing
+ *
+ * Methods `register`, `render` and `update` call the same methods on all the `Track` instances, which call the same methods one on all its `Layer` instances.
+ * - `register`: registers a `Track` instance onto the timeline (ie. the timeline can `render` and `update` its different tracks)
+ * - `render`: renders the DOM for the element (if has one) and its descendant (here renders the tracks, ie. render the DOM tree for a track and attach it in the DOM at the right place)
+ * - `update`: update the display according to data changes (ie. update the DOM element attached to the DOM tree with render method, based on new data).
+ */
+function Timeline(pixelsPerSecond, visibleWidth) {
 
 	EventEmitter.call(this);
 
-	this._defaults = {
-		pixelsPerSecond: 100,
-		containersWidth: 1000,
-	};
+	if (pixelsPerSecond == undefined) 
+		pixelsPerSecond = 100;
+
+	if (visibleWidth == undefined)
+		visibleWidth = 1000;
 
 	// public attributes
-	this.params = Object.assign({}, this._defaults, params);
-	this.timeContext = null;
-	this.layers = [];
-	this.containers = {};
-	// @NOTE realy needed ?
-	this.groupedLayers = {}; // group layer by categories
-	this.timeContextBehavior = new TimeContextBehavior();
-	// private attributes
-	this._state = null;
-	this._layerContainerMap = new Map();
-	this._handleEvent = this._handleEvent.bind(this);
+	this._tracks = new TrackCollection(this);
 
-	this._createTimeContext();
-	this._createInteraction(Keyboard, 'body');
-	this.ns = 'http://www.w3.org/2000/svg';
+    this._state = null;
+    this._handleEvent = this._handleEvent.bind(this);
+    this._createInteraction(Keyboard, 'body');
+    // stores
+    this._trackById = {};
+    this._groupedLayers = {};
+
+    this.timeContext = new TimelineTimeContext(pixelsPerSecond, visibleWidth);
 
 
 	Object.defineProperties(this, {
-		'pixelsPerSecond' : {
-			get : function() {
-				return this.params.pixelsPerSecond;
+
+		/**
+		 *  TimeContext accessors
+		 */
+		'offset' : {
+			get: function() {
+				return this.timeContext.offset;
+			},
+			set: function(value) {
+				this.timeContext.offset = value;
+			}
+		}, 
+		
+		'zoom' : {
+			get: function() {
+				return this.timeContext.zoom;
 			}, 
-			set : function(value) {
-				this.params.pixelsPerSecond = value;
-				this.timeContext.xScaleRange = [0, this.params.pixelsPerSecond];
-				this.timeContext.containersDuration = this.params.containersWidth / value
+			set: function(value) {
+				this.timeContext.zoom = value;
+			}
+		}, 
+
+		'pixelsPerSecond' : {
+			get: function() {
+				return this.timeContext.pixelsPerSecond;
+			}, 
+			set: function(value) {
+				this.timeContext.pixelsPerSecond = value;
 			}
 		},
-		'containersWidth' : {
-			get : function() {
-				return this.params.containersWidth;
+
+		// @readonly
+		'visibleDuration' : {
+			get: function() {
+				return this.timeContext.visibleWidth;
+			}
+		},
+
+		'visibleWidth' : {
+			get: function() {
+				return this.timeContext.visibleWidth;
 			}, 
-			set : function(value) {
-				this.setContainersWidth(value);
+			set: function(value) {
+				this.timeContext.visibleWidth = value;
+			}
+		},
+
+		// @NOTE maybe expose as public instead of get/set for nothing...
+		'maintainVisibleDuration' : {
+			get: function() {
+				return this.timeContext.maintainVisibleDuration;
+			}, 
+			set: function(bool) {
+				this.timeContext.maintainVisibleDuration = bool;
+			}
+		},
+
+		// @readonly - used in track collection
+		'groupedLayers' : {
+			get: function() {
+				return this._groupedLayers;
+			}
+		},
+
+		/**
+		 * Changes the state of the timeline
+		 * @param {BaseState} state - the state in which the timeline must be setted
+		 */
+		'state' : {
+			get: function() {
+				return this._state;
+			}, 
+			set: function(state) {
+				if (this._state) { 
+					this._state.exit(); 
+				}
+				this._state = state;
+				this._state.enter();
+			}
+		},
+
+		/**
+		 *  Shortcut to access the Track collection
+		 *  @return {TrackCollection}
+		 */
+		'tracks' : {
+			get: function() {
+				return this._tracks;
+			}
+		},
+
+		/**
+		 * Shortcut to access the Layer list
+		 * @return {Array}
+		 */
+		'layers' : {
+			get: function() {
+				return this._tracks.layers;
 			}
 		}
 	});
 
-
-	this.setContainersWidth = function(value, maintainVisibleDuration) {
-		if (maintainVisibleDuration == undefined) 
-			maintainVisibleDuration = false;
-
-		const lastContainersWidth = this.params.containersWidth;
-		const lastPixelsPerSecond = this.params.pixelsPerSecond;
-
-		this.params.containersWidth = value;
-		this.timeContext.containersDuration = value / this.params.pixelsPerSecond;
-
-		if (maintainVisibleDuration) {
-			const ratio = lastPixelsPerSecond / lastContainersWidth;
-			this.pixelsPerSecond = ratio * this.params.containersWidth;
-		}
-	}
-
-	/**
-	 * Factory method to add interaction modules the timeline should listen to
-	 * by default, the timeline listen to Keyboard, and instance a Surface on each
-	 * container
-	 * @param ctor {EventSource} the contructor of the interaction module to instanciate
-	 * @param el {DOMElement} the DOM element to bind to the EventSource module
-	 * @param options {Object} options to be applied to the ctor (defaults to `{}`)
-	 */
-	this._createInteraction = function(ctor, el, options) {
-		if (options == undefined)
-			options = {};
-		const interaction = new ctor(el, options);
-		interaction.on('event', this._handleEvent);
-	}
-
-	/**
-	 * @private
-	 * @description Creates a new TimeContext for the visualisation, this `TimeContext`
-	 * will be at the top of the `TimeContext` tree
-	 */
-	this._createTimeContext = function() {
-		const pixelsPerSecond = this.params.pixelsPerSecond;
-		const containersWidth = this.params.containersWidth;
-
-		const xScale = d3Scale.linear()
-			.domain([0, 1])
-			.range([0, pixelsPerSecond]);
-
-		this.timeContext = new TimelineTimeContext();
-		// all child context inherits the max duration allowed in container per default
-		this.timeContext.containersDuration = containersWidth / pixelsPerSecond;
-		this.timeContext.xScale = xScale;
-	}
-
-	/**
-	 * Change the state of the timeline, `States` are the main entry point between
-	 * application logic, interactions, ..., and the library
-	 * @param {BaseState} state - the state in which the timeline must be setted
-	 */
-	this.setState = function(state) {
-		if (this._state) { 
-			this._state.exit(); 
-		}
-		this._state = state;
-		this._state.enter();
-	}
-
-	/**
-	 * @private
-	 * The callback that is used to listen to interactions modules
-	 * @params e {Event} a custom event generated by interaction modules
-	 */
-	this._handleEvent = function(e) {
-		// emit event as a middleware
-		this.emit('event', e);
-		// propagate to the state
-		if (!this._state) { 
-			return; 
-		}
-		this._state.handleEvent(e);
-	}
-
-	/**
-	 * Register a container and prepare the DOM svg element for the timeline's layers
-	 *
-	 * Containers display the view on the timeline in theirs DOM svg element.
-	 * The timeline timeContext offset set all the containers to display temporal representation from that offset time.
-	 *
-	 * Container SVG structure
-	 * <svg>
-	 *  <defs> Unused for the moment, could be used to define custom shapes for use with layers
-	 *  </defs>
-	 *  <g class="offset">
-	 *   <g class="layout"> The layers are inserted here
-	 *   </g>
-	 *  </g>
-	 *  <g class="interactions"> Placeholder to visualize interactions (eg. brush)
-	 *  </g>
-	 * </svg>
-	 * @param id {String} a user defined id for the container
-	 * @param el {DOMElement} the DOMElement to use as a container
-	 * @param options {Object} the options to apply to the container
-	 */
-	this.registerContainer = function(el, options, containerId) {
-
-		if (options == undefined)
-			options = {};
-
-		if (containerId == undefined)
-			containerId = 'default';
-
-
-		const height = options.height || 120;
-		const width = this.params.containersWidth;
-		const svg = document.createElementNS(this.ns, 'svg');
-
-		svg.setAttributeNS(null, 'height', height);
-		svg.setAttributeNS(null, 'shape-rendering', 'optimizeSpeed');
-		svg.setAttribute('xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
-		svg.setAttributeNS(null, 'width', width);
-		svg.setAttributeNS(null, 'viewbox', `0 0 ${width} ${height}`);
-
-		const defs = document.createElementNS(this.ns, 'defs');
-
-		const offsetGroup = document.createElementNS(this.ns, 'g');
-		offsetGroup.classList.add('offset');
-
-		const layoutGroup = document.createElementNS(this.ns, 'g');
-		layoutGroup.classList.add('layout');
-
-		const interactionsGroup = document.createElementNS(this.ns, 'g');
-		interactionsGroup.classList.add('interactions');
-
-		svg.appendChild(defs);
-		offsetGroup.appendChild(layoutGroup);
-		svg.appendChild(offsetGroup);
-		svg.appendChild(interactionsGroup);
-
-		el.appendChild(svg);
-		el.style.fontSize = 0; // removes additionnal height added who knows why...
-		el.style.transform = 'translateZ(0)'; // fixes one of the (many ?) weird canvas rendering bugs in Chrome
-
-		// store all informations about this container
-		const container = {
-			id: containerId,
-			height: height,
-			layoutElement: layoutGroup,
-			offsetElement: offsetGroup,
-			interactionsElement: interactionsGroup,
-			svgElement: svg,
-			DOMElement: el,
-			brushElement: null
-		};
-
-		this.containers[containerId] = container;
-		this._createInteraction(Surface, el);
-	}
-
-	/**
-	 * Adds a `Layer` to the Timeline
-	 * @param layer {Layer} the layer to register
-	 * @param containerId {String} a valid id of a previsouly registered container
-	 * @param group {String} insert the layer into some user defined group of layers
-	 * @param timeContext {TimeContext} a `TimeContext` the layer is associated with
-	 *     if null given, a new `TimeContext` will be created for the layer
-	 */
-	this.addLayer = function(layer, containerId, group) {
-
-		if (containerId == undefined)
-			containerId = 'default';
-
-		if (group == undefined)
-			group = 'default';
-
-		const container = this.containers[containerId];
-		this._layerContainerMap.set(layer, container);
-		this.layers.push(layer);
-
-		if (!this.groupedLayers[group]) {
-			this.groupedLayers[group] = [];
-		}
-
-		this.groupedLayers[group].push(layer);
-		// render the layer's container inside the container
-		container.layoutElement.appendChild(layer.renderContainer());
-	}
-
-	/**
-	 * Remove a layer from the timeline
-	 * @param layer {Layer} the layer to remove
-	 * @TODO test
-	 */
-	this.removeLayer = function(layer) {
-		const container = this._layerContainerMap.get(layer);
-
-		this.layers.splice(this.layers.indexOf(layer), 1);
-		this._layerContainerMap.delete(layer);
-
-		// remove from groupedLayers
-		for (let key in this.groupedLayers) {
-			const group = this.groupedLayers[key];
-			const index = group.indexOf(layer);
-
-			if (index !== -1) {
-				group.splice(index, 1);
-			}
-			// if group is empty, delete it
-			if (group.length === 0) {
-				delete this.groupedLayers[key];
-			}
-		}
-
-		// remove layer from its container
-		container.layoutElement.removeChild(layer.container);
-		}
-
-		// // TimecontextBehavior
-		// editLayer(layer, dx, dy, target) {
-		//   this.timeContextBehavior.edit(layer, dx, dy, target);
-		//   // this.emit('edit:timeContext', layer, layer.timeContext);
-		// }
-
-		// stretchLayer(layer, dx, dy, target) {
-		//   this.timeContextBehavior.stretch(layer, dx, dy, target);
-		//   // this.emit('edit:timeContext', layer, layer.timeContext);
-		// }
-
-		// setEditableLayer(layer, bool) {
-		//   this.timeContextBehavior.setEditable(layer, bool);
-		//   // this.emit('edit:timeContext', layer, layer.timeContext);
-		// }
-
-		// -----------------------------------------------
-		// @NOTE remove those helpers ?
-		// -----------------------------------------------
-
-		// @NOTE change to `getContainer(el || id || layer)` ?
-		this.getContainerFromDOMElement = function(el) {
-		for (let id in this.containers) {
-			const container = this.containers[id];
-			if (container.DOMElement === el) { 
-				return container; 
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	* Returns an array of layers given some group
-	* @param group {String} name of the group
-	* @return {Array} an array of layers which belongs to the group
-	*/
-	this.getLayersFromGroup = function(group) {
-		if (group == undefined)
-			group = 'default';
-		return this.groupedLayers[group] || [];
-	}
-
-	this.getLayerContainer = function(layer) {
-		return this._layerContainerMap.get(layer);
-	}
-
-	// getContainerPerId(id) {
-	//   return this.containers[id];
+	// TODO: TRANSLATE THIS INTO "NORMAL" JAVASCRIPT
+	// *[Symbol.iterator]() {
+	// 	yield* this.tracks[Symbol.iterator]();
 	// }
-
-	// -----------------------------------------------
-
-	/**
-	 * @param layerOrGroup {mixed} defaults null
-	 * @return an array of layers
-	 */
-	this._getLayers = function(layerOrGroup) {
-		if (layerOrGroup == undefined)
-			layerOrGroup = null;
-
-		let layers = null;
-
-		if (typeof layerOrGroup === 'string') {
-			layers = this.groupedLayers[layerOrGroup];
-		} else if (layerOrGroup instanceof Layer) {
-			layers = [layerOrGroup];
-		} else {
-			layers = this.layers;
-		}
-
-		return layers;
-	}
-
-	/**
-	 * Draw all the layers in the timeline
-	 */
-	this.drawLayersShapes = function(layerOrGroup) {
-
-		if (layerOrGroup == undefined)
-			layerOrGroup = null;
-
-		const layers = this._getLayers(layerOrGroup);
-		layers.forEach(function(layer){
-			layer.drawShapes();
-		});
-	}
-
-	/**
-	 * Update all the containers according to `this.timeContext`
-	 */
-	this.update = function(layerOrGroup) {
-
-		if (layerOrGroup == undefined)
-			layerOrGroup = null;
-
-		const layers = this._getLayers(layerOrGroup);
-
-		this.updateTimelineContainers();
-		this.updateLayersContainers(layerOrGroup);
-		this.updateLayersShapes(layerOrGroup);
-
-		this.emit('update', layers);
-	}
-
-	this.updateTimelineContainers = function() {
-		const timeContext = this.timeContext;
-		const width = this.params.containersWidth;
-
-		for (let id in this.containers) {
-			const container = this.containers[id];
-			const $offset   = container.offsetElement;
-			const $svg      = container.svgElement;
-			const height    = container.height;
-			const translate = `translate(${timeContext.xScale(timeContext.offset)}, 0)`;
-
-			$svg.setAttributeNS(null, 'width', width);
-			$svg.setAttributeNS(null, 'viewbox', `0 0 ${width} ${height}`);
-
-			$offset.setAttributeNS(null, 'transform', translate);
-		}
-	}
-
-	this.updateLayersContainers = function(layerOrGroup) {
-		if (layerOrGroup == undefined)
-			layerOrGroup = null;
-		const layers = this._getLayers(layerOrGroup);
-		layers.forEach(function(layer) {
-			layer.updateContainer()
-		});
-	}
-
-	this.updateLayersShapes = function(layerOrGroup) {
-		if (layerOrGroup == undefined)
-			layerOrGroup = null;
-		const layers = this._getLayers(layerOrGroup);
-		layers.forEach(function(layer) {
-			layer.updateShapes()
-		});
-	}
-
 }
 
 Timeline.prototype = Object.create(EventEmitter.prototype);
 
 Timeline.prototype.constructor = Timeline;
 
-if (!Object.assign) {
-	Object.defineProperty(Object, 'assign', {
-		enumerable: false,
-		configurable: true,
-		writable: true,
-		value: function(target) {
-			'use strict';
-			if (target === undefined || target === null) {
-				throw new TypeError('Cannot convert first argument to object');
-			}
+/**
+ * Factory method to add interaction modules the timeline should listen to.
+ * By default, the timeline listen to Keyboard, and instance a Surface on each container
+ * @param {EventSource} ctor - the contructor of the interaction module to instanciate
+ * @param el {DOMElement} the DOM element to bind to the EventSource module
+ * @param options {Object} options to be applied to the ctor (defaults to `{}`)
+ */
+Timeline.prototype._createInteraction = function(ctor, el, options) {
+	if (options == undefined)
+		options = {};
 
-			var to = Object(target);
-			for (var i = 1; i < arguments.length; i++) {
-				var nextSource = arguments[i];
-				if (nextSource === undefined || nextSource === null) {
-					continue;
-				}
-				nextSource = Object(nextSource);
+	const interaction = new ctor(el, options);
+	interaction.on('event', this._handleEvent);
+}
 
-				var keysArray = Object.keys(Object(nextSource));
-				for (var nextIndex = 0, len = keysArray.length; nextIndex < len; nextIndex++) {
-					var nextKey = keysArray[nextIndex];
-					var desc = Object.getOwnPropertyDescriptor(nextSource, nextKey);
-					if (desc !== undefined && desc.enumerable) {
-						to[nextKey] = nextSource[nextKey];
-					}
-				}
-			}
-			return to;
+/**
+ * The callback that is used to listen to interactions modules
+ * @params {Event} e - a custom event generated by interaction modules
+ */
+Timeline.prototype._handleEvent = function(e) {
+	// emit event as a middleware
+	this.emit('event', e);
+	// propagate to the state
+	if (!this._state) { 
+		return; 
+	}
+	this._state.handleEvent(e);
+}
+
+
+
+
+/**
+ * Adds a track to the timeline
+ * Tracks display this window on the timeline in theirs own SVG element.
+ * @param {Track} track
+ */
+Timeline.prototype.add = function(track) {
+	if (this.tracks.indexOf(track) !== -1) {
+		throw new Error('track already added to the timeline');
+	}
+
+	track.configure(this.timeContext);
+
+	this.tracks.push(track);
+	this._createInteraction(Surface, track.$el);
+}
+
+Timeline.prototype.remove = function(track) {
+	// @TODO
+}
+
+/**
+ *  Creates a new track from the configuration define in `configureTracks`
+ *  @param {DOMElement} $el - the element to insert the track inside
+ *  @param {Object} options - override the defaults options if necessary
+ *  @param {String} [trackId=null] - optionnal id to give to the track, only exists in timeline's context
+ *  @return {Track}
+ */
+Timeline.prototype.createTrack = function($el, trackHeight, trackId) {
+	
+	if (trackHeight == undefined)
+		trackHeight = null;
+
+	if (trackId == undefined)
+		trackId = null;
+
+	const track = new Track($el, trackHeight);
+
+	if (trackId !== null) {
+		if (this._trackById[trackId] !== undefined) {
+			throw new Error("trackId: " + trackId + " is already used");
+		}
+
+		this._trackById[trackId] = track;
+	}
+	// add track to the timeline
+	this.add(track);
+	return track;
+}
+
+/**
+ *  Adds a layer to a track, allow to group track arbitrarily inside groups. Basically a wrapper for `track.add(layer)`
+ *  @param {Layer} layer - the layer to add
+ *  @param {Track} track - the track to the insert the layer in
+ *  @param {String} [groupId='default'] - the group in which associate the layer
+ */
+Timeline.prototype.addLayer = function(layer, trackOrTrackId, groupId) {
+
+	if (groupId == undefined)
+		groupId = 'default';
+
+	let track = trackOrTrackId;
+
+	if (typeof trackOrTrackId === 'string') {
+		track = this.getTrackById(trackOrTrackId);
+	}
+	// we should have a Track instance at this point
+	track.add(layer);
+
+	if (!this._groupedLayers[groupId]) {
+		this._groupedLayers[groupId] = [];
+	}
+
+	this._groupedLayers[groupId].push(layer);
+}
+
+/**
+ *  Removes a layer from its track (the layer is detatched from the DOM but can still be reused)
+ *  @param {Layer} layer - the layer to remove
+ */
+Timeline.prototype.removeLayer = function(layer) {
+	this.tracks.forEach(function(track) {
+		const index = track.layers.indexOf(layer);
+		if (index !== -1) { 
+			track.remove(layer); 
 		}
 	});
+
+	for (let groupId in this._groupedLayers) {
+		const group = this._groupedLayers[groupId];
+		const index = group.indexOf(layer);
+
+		if (index !== -1) { 
+			group.splice(layer, 1); 
+		}
+
+		if (!group.length) {
+			delete this._groupedLayers[groupId];
+		}
+	}
+}
+
+/**
+ *  Returns a track from it's id
+ *  @param {String} trackId
+ *  @return {Track}
+ */
+Timeline.prototype.getTrackById = function(trackId) {
+	return this._trackById[trackId];
+}
+
+/**
+ * Returns an array of layers from their group Id
+ * @param {String} groupId
+ * @return {Array}
+ */
+Timeline.prototype.getLayersByGroup = function(groupId) {
+	return this._groupedLayers[groupId];
 }
