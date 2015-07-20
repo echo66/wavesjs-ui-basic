@@ -29,7 +29,7 @@ function TimelineTimeContext(pixelsPerSecond, visibleWidth) {
     this._pixelsPerSecond = pixelsPerSecond;
     // params
     this._visibleWidth = visibleWidth;
-    this._visibleDuration = this.visibleWidth / this.pixelsPerSecond;
+    this._visibleDuration = this._visibleWidth / this._pixelsPerSecond;
     this._maintainVisibleDuration = false;
 
     // create the timeToPixel scale

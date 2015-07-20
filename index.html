@@ -44,7 +44,7 @@
       var data1 = [
         { width: 3, x: 0 }, 
         { width: 6, x: 6}, 
-        { width: 12, x: 30}
+        { width: 12, x: 200}
       ];
 
       var data2 = [
@@ -52,7 +52,7 @@
         { width: 5, x: 4}
       ];
       
-      var timeline = new Timeline();
+      var timeline = new Timeline(10);
 
       // var track1 = new Track(track1Div, trackHeight);
       // var track2 = new Track(track2Div, trackHeight);
@@ -93,7 +93,7 @@
       layerTimeContext2.xScale = d3Scale3;
       timeline.timeContext.xScale = d3Scale1;
 
-      layerTimeContext1.duration = layerTimeContext2.duration = timeline.timeContext.duration = 1000;
+      layerTimeContext1.duration = layerTimeContext2.duration = 1000;
 
       var layer1 = new SegmentLayer(data1);
       // var layer2 = new SegmentLayer(data2);
