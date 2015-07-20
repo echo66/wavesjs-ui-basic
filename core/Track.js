@@ -60,6 +60,7 @@ function Track($el, height) {
   this.$el = $el;
   this.layers = [];
   this._height = height;
+  
 
   // are set when added to the timeline
   this.renderingContext = null;
@@ -70,7 +71,7 @@ function Track($el, height) {
   Object.defineProperties(this, {
     'ns' : {
       get : function() {
-        return 'http://www.w3.org/2000/svg';
+        return "http://www.w3.org/2000/svg";
       }
     }, 
     'height' : {
@@ -118,19 +119,19 @@ Track.prototype.destroy = function() {
  *  Creates the container for the track
  */
 Track.prototype._createContainer = function() {
-  const $svg = document.createElementNS(this.ns, 'svg');
+  const $svg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
   $svg.setAttributeNS(null, 'shape-rendering', 'optimizeSpeed');
   $svg.setAttribute('xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
 
-  const $defs = document.createElementNS(this.ns, 'defs');
+  const $defs = document.createElementNS("http://www.w3.org/2000/svg", 'defs');
 
-  const $offsetGroup = document.createElementNS(this.ns, 'g');
+  const $offsetGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
   $offsetGroup.classList.add('offset');
 
-  const $layoutGroup = document.createElementNS(this.ns, 'g');
+  const $layoutGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
   $layoutGroup.classList.add('layout');
 
-  const $interactionsGroup = document.createElementNS(this.ns, 'g');
+  const $interactionsGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
   $interactionsGroup.classList.add('interactions');
 
   $svg.appendChild($defs);
@@ -172,7 +173,7 @@ Track.prototype.remove = function(layer) {
  * Draw tracks, and the layers in cascade
  */
 Track.prototype.render = function() {
-  for (let layer of this) { 
+  for (var layer of this.layers) { 
     layer.render(); 
   }
 }
@@ -192,13 +193,13 @@ Track.prototype.updateContainer = function() {
   const $offset = this.$offset;
   // should be in some update layout
   const renderingContext = this.renderingContext;
-  const height  = this.height;
+  const height  = this._height;
   const width   = renderingContext.visibleWidth;
   const offsetX = renderingContext.xScale(renderingContext.offset);
   const translate = "translate(" + offsetX + ", 0)";
 
-  $svg.setAttributeNS(null, 'height', height);
-  $svg.setAttributeNS(null, 'width', width);
+  $svg.setAttributeNS(null, 'height', height + "px");
+  $svg.setAttributeNS(null, 'width', width + "px");
   $svg.setAttributeNS(null, 'viewbox', "0 0 " + width + " " + height + "");
 
   $offset.setAttributeNS(null, 'transform', translate);
@@ -206,13 +207,15 @@ Track.prototype.updateContainer = function() {
 
 Track.prototype.updateLayers = function(layers) {
 
+  var that = this;
+
   if (layers == undefined) 
     layers = null;
 
   layers = (layers === null) ? this.layers : layers;
 
   layers.forEach(function(layer) {
-    if (this.layers.indexOf(layer) === -1) { 
+    if (that.layers.indexOf(layer) === -1) { 
       return; 
     }
     layer.update();

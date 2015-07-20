@@ -6,17 +6,30 @@
       <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
   <body>
-  	<script type="text/javascript" src="d3.v2.js"></script>
+  	<script type="text/javascript" src="d3.js"></script>
   	<script type="text/javascript" src="EventEmitter.js"></script>
+
     <script type="text/javascript" src="interactions/EventSource.js"></script>
     <script type="text/javascript" src="interactions/Surface.js"></script>
     <script type="text/javascript" src="interactions/Keyboard.js"></script>
+
+    <script type="text/javascript" src="shapes/BaseShape.js"></script>
+    <script type="text/javascript" src="shapes/Segment.js"></script>
+
+    <script type="text/javascript" src="behaviors/BaseBehavior.js"></script>
+    <script type="text/javascript" src="behaviors/SegmentBehavior.js"></script>
+    <script type="text/javascript" src="behaviors/TimeContextBehavior.js"></script>
+
     <script type="text/javascript" src="core/AbstractTimeContext.js"></script>
     <script type="text/javascript" src="core/TimelineTimeContext.js"></script>
-    <script type="text/javascript" src="core/Track.js"></script>
+    <script type="text/javascript" src="core/LayerTimeContext.js"></script>
+    <script type="text/javascript" src="core/Layer.js"></script>
     <script type="text/javascript" src="core/Track.js"></script>
     <script type="text/javascript" src="core/TrackCollection.js"></script>
   	<script type="text/javascript" src="core/Timeline.js"></script>
+
+    <script type="text/javascript" src="helpers/SegmentLayer.js"></script>
+
   	<script type="text/javascript">
 
       var track1Div = document.createElement("div");
@@ -28,7 +41,16 @@
 
       var trackHeight = 100;
 
-      var data = [{ width: 3, x: 0 }, { width: 6, x: 6}];
+      var data1 = [
+        { width: 3, x: 0 }, 
+        { width: 6, x: 6}, 
+        { width: 12, x: 30}
+      ];
+
+      var data2 = [
+        { width: 1, x: 0 }, 
+        { width: 5, x: 4}
+      ];
       
       var timeline = new Timeline();
 
@@ -40,9 +62,51 @@
       // timeline.add(track2);
       // timeline.add(track3);
 
-      timeline.createTrack(track1Div, trackHeight, "track1");
-      timeline.createTrack(track2Div, trackHeight, "track2");
+      // timeline.createTrack(track1Div, trackHeight, "track1");
+      // timeline.createTrack(track2Div, trackHeight, "track2");
+      // timeline.createTrack(track3Div, trackHeight, "track3");
+
+      // var layer1 = new Layer('collection', data1, {});
+      // layer1.configureShape(Segment);
+      // var layer2 = new Layer('collection', data2, {});
+      // layer2.configureShape(Segment);
+
+      // timeline.addLayer(layer1, "track1", "default");
+      // timeline.addLayer(layer2, "track1", "default");
+
+      var track1 = new Track(track1Div);
+      timeline.add(track1);
+      // var track2 = new Track(track2Div);
+      // timeline.add(track2);
+      // var track3 = new Track(track3Div);
+      // timeline.add(track3);
+
+      var d3Scale1 = d3.scale.linear();
+      var d3Scale2 = d3.scale.linear();
+      var d3Scale3 = d3.scale.linear();
+
       
+      var layerTimeContext1 = new LayerTimeContext(timeline.timeContext);
+      var layerTimeContext2 = new LayerTimeContext(timeline.timeContext);
+
+      layerTimeContext1.xScale = d3Scale2;
+      layerTimeContext2.xScale = d3Scale3;
+      timeline.timeContext.xScale = d3Scale1;
+
+      layerTimeContext1.duration = layerTimeContext2.duration = timeline.timeContext.duration = 1000;
+
+      var layer1 = new SegmentLayer(data1);
+      // var layer2 = new SegmentLayer(data2);
+
+      layer1.setTimeContext(layerTimeContext1);
+      // layer2.setTimeContext(layerTimeContext2);
+
+      track1.add(layer1);
+      // track1.add(layer2);
+
+      timeline.tracks.render();
+
+      timeline.tracks.update();
 
   	</script>
   </body>

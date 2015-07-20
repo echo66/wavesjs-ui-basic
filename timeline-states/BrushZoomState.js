@@ -4,7 +4,14 @@ function BrushZoomState(timeline) {
   
   BaseState.call(this, timeline);
 
-  this.ns = 'http://www.w3.org/2000/svg';
+  Object.defineProperties(this, {
+    'ns' : {
+      get : function() {
+        return 'http://www.w3.org/2000/svg';
+      }
+    }
+  });
+
 
   this.handleEvent = function(e) {
     switch(e.type) {
@@ -27,12 +34,11 @@ function BrushZoomState(timeline) {
     this.brushes = [];
     this.startX = e.x;
     // create brush in each containers
-    for (let id in this.timeline.containers) {
-      const container = this.timeline.containers[id];
-      const interactions = container.interactionsElement;
+    this.views.forEach(function(view) {
+      const interactions = view.$interactions;
 
-      const brush = document.createElementNS(this.ns, 'rect');
-      brush.setAttributeNS(null, 'height', container.height);
+      const brush = document.createElementNS(ns, 'rect');
+      brush.setAttributeNS(null, 'height', view.height);
       brush.setAttributeNS(null, 'y', 0);
       brush.style.fill = '#787878';
       brush.style.opacity = 0.2;
@@ -40,7 +46,7 @@ function BrushZoomState(timeline) {
       interactions.appendChild(brush);
 
       this.brushes.push(brush);
-    }
+    });
   }
 
   this.onMouseMove = function(e) {
@@ -60,22 +66,23 @@ function BrushZoomState(timeline) {
       brush.parentNode.removeChild(brush);
     });
 
-    const timeline = this.timeline;
-    const timeContext = timeline.timeContext;
-    // update timeline
-    const startX = this.startX;
-    const endX = e.x;
+    this.views.forEach((view) => {
+      const timeContext = view.timeContext;
+      // update timeContext
+      const startX = this.startX;
+      const endX = e.x;
 
-    const minTime = timeContext.xScale.invert(Math.min(startX, endX));
-    const maxTime = timeContext.xScale.invert(Math.max(startX, endX));
-    const deltaDuration = maxTime - minTime;
+      const minTime = timeContext.xScale.invert(Math.max(0, Math.min(startX, endX)));
+      const maxTime = timeContext.xScale.invert(Math.max(startX, endX));
+      const deltaDuration = maxTime - minTime;
 
-    const stretchRatio = timeContext.containersDuration / deltaDuration;
+      const stretchRatio = timeContext.duration / deltaDuration;
 
-    timeContext.offset = -minTime;
-    timeContext.stretchRatio = stretchRatio;
+      view.offset = -minTime;
+      view.zoom = stretchRatio;
+    });
 
-    timeline.update();
+    this.views.update();
   }
 
   this.onKeyDown = function(e) {

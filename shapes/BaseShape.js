@@ -77,7 +77,9 @@ BaseShape.prototype._createAccessors = function(accessors) {
   // setter : `this.x = callback`
   // getter : `this.x(datum)`
   Object.keys(accessors).forEach(function(name) {
-    if (proto.hasOwnProperty(name)) { return; }
+    if (proto.hasOwnProperty(name)) { 
+      return; 
+    }
 
     Object.defineProperty(proto, name, {
       get: function() { 
@@ -96,16 +98,22 @@ BaseShape.prototype._createAccessors = function(accessors) {
  * accessor for each accesors
  */
 BaseShape.prototype._setDefaultAccessors = function(accessors) {
+  var _this = this;
+
   Object.keys(accessors).forEach(function(name) {
     const defaultValue = accessors[name];
-    let accessor = function(d, v = null) {
+    let accessor = function(d) {
+
+      const v = arguments[1] === undefined ? null : arguments[1];
+
       if (v === null) { 
         return d[name] || defaultValue; 
       }
+      
       d[name] = v;
     };
     // set accessor as the default one
-    this[name] = accessor;
+    _this[name] = accessor;
   });
 }
 

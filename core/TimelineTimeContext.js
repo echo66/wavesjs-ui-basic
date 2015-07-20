@@ -20,13 +20,24 @@ function TimelineTimeContext(pixelsPerSecond, visibleWidth) {
 
 	this._children = [];
 
-	this._xScale = null;
-	this._originalXScale = null;
+    // @rename to timeToPixel
+    this._xScale = null;
+    this._originalXScale = null;
 
-	// params
-	this._containersDuration = 1; // for layers inheritance only
-	this._offset = 0;
-	this._stretchRatio = 1;
+    this._offset = 0;
+    this._zoom = 1;
+    this._pixelsPerSecond = pixelsPerSecond;
+    // params
+    this._visibleWidth = visibleWidth;
+    this._visibleDuration = this.visibleWidth / this.pixelsPerSecond;
+    this._maintainVisibleDuration = false;
+
+    // create the timeToPixel scale
+    const xScale = d3.scale.linear()
+      .domain([0, 1])
+      .range([0, pixelsPerSecond]);
+
+    this.xScale = xScale;
 
 	Object.defineProperties(this, {
 
@@ -120,7 +131,7 @@ function TimelineTimeContext(pixelsPerSecond, visibleWidth) {
 			get: function() {
 				return this._xScale;
 			}, 
-			set: function(value) {
+			set: function(scale) {
 				this._xScale = scale;
 
 				if (!this._originalXScale) {
@@ -146,7 +157,7 @@ function TimelineTimeContext(pixelsPerSecond, visibleWidth) {
 				return this._originalXScale;
 			}, 
 			set: function(value) {
-				this._originalXScale = scale;
+				this._originalXScale = value;
 			}
 		}
 	})

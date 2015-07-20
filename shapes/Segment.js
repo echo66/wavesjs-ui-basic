@@ -7,6 +7,11 @@ function Segment(options) {
 
 }
 
+Segment.prototype = Object.create(BaseShape.prototype);
+
+Segment.prototype.constructor = Segment;
+
+
 Segment.prototype.getClassName = function() { 
   return 'segment'; 
 }
@@ -101,7 +106,3 @@ Segment.prototype.inArea = function(renderingContext, datum, x1, y1, x2, y2) {
 
   return area > 0;
 }
-
-Segment.prototype = Object.create(BaseShape.prototype);
-
-Segment.prototype.constructor = Segment;

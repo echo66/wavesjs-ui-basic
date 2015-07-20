@@ -26,7 +26,7 @@
  */
 function LayerTimeContext(parent) {
 
-	this.params = params;
+	AbstractTimeContext.call(this, {});
 
 	if (!parent) { 
 		throw new Error('LayerTimeContext must have a parent'); 
@@ -87,12 +87,14 @@ function LayerTimeContext(parent) {
 			set : function(value) {
 				// remove local xScale if ratio = 1
 				if (value ===  1) {
-				this._xScale = null;
-				return;
+					this._xScale = null;
+					return;
 				}
 
 				const xScale = this.parent.originalXScale.copy();
-				const [min, max] = xScale.domain();
+				const domain = xScale.domain();
+				const min = domain[0];
+				const max = domain[1];
 				const diff = (max - min) / (value * this.parent.stretchRatio);
 
 				xScale.domain([min, min + diff]);
@@ -122,3 +124,7 @@ function LayerTimeContext(parent) {
 		}
 	});
 }
+
+LayerTimeContext.prototype = Object.create(AbstractTimeContext.prototype);
+
+LayerTimeContext.prototype.constructor = LayerTimeContext;
